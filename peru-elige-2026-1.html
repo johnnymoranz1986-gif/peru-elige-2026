@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Perú Elige 2026 — Resultados ONPE</title>
+  <meta name="description" content="Resultados oficiales ONPE en tiempo real — Elecciones Generales Perú 2026"/>
+  <meta property="og:title" content="Perú Elige 2026"/>
+  <meta property="og:description" content="Tracker de resultados electorales en tiempo real"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Oswald:wght@600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#060608;min-height:100vh}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes ticker{from{transform:translateX(100vw)}to{transform:translateX(-200%)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes glitch{0%,93%,100%{transform:none;opacity:1}94%{transform:skewX(-3deg) translateX(2px);opacity:0.85}96%{transform:skewX(2deg) translateX(-2px);opacity:0.9}98%{transform:none;opacity:1}}
+    @keyframes pulse-glow{0%,100%{text-shadow:-1px 0 rgba(255,60,60,0.5),1px 0 rgba(60,120,255,0.5),0 0 18px rgba(232,160,48,0.7)}50%{text-shadow:-2px 0 rgba(255,60,60,0.7),2px 0 rgba(60,120,255,0.7),0 0 28px rgba(232,160,48,1)}}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ============================================================
+   ✏️  ZONA DE ACTUALIZACIÓN — SOLO TOCA ESTOS NÚMEROS
+   Fuente: resultadoelectoral.onpe.gob.pe
+   ============================================================ */
+
+const ACTAS_INIT       = 93.487;             // % actas contabilizadas
+const ULTIMA_ACT       = "19/04/2026 · 13:34"; // fecha y hora
+const ACTAS_PENDIENTES = "282 (0.3%)";
+const ACTAS_IMPUGNADAS = "5,764 (6.2%)";
+
+// Solo cambia pct y votos de cada candidato
+const DATOS = [
+  { pct: 17.056, votos: 2687621 },  // 1. FUJIMORI
+  { pct: 12.007, votos: 1892064 },  // 2. SÁNCHEZ
+  { pct: 11.921, votos: 1878493 },  // 3. LÓPEZ ALIAGA
+  { pct: 11.063, votos: 1743316 },  // 4. NIETO
+  { pct: 10.167, votos: 1601087 },  // 5. BELMONT
+  { pct:  7.886, votos: 1241785 },  // 6. ÁLVAREZ
+  { pct:  3.431, votos:  540130 },  // 7. PÉREZ TELLO
+  { pct:  3.376, votos:  531413 },  // 8. ESPÁ
+];
+
+/* ============================================================
+   🔒  NO TOCAR DE AQUÍ PARA ABAJO
+   ============================================================ */
+
+const BASE = [
+  { id:"fujimori",    short:"KF", nombre:"FUJIMORI",     partido:"Fuerza Popular",            color:"#FF6B35", wiki:"Keiko_Fujimori" },
+  { id:"sanchez",     short:"RS", nombre:"SÁNCHEZ",      partido:"Juntos por el Perú",        color:"#FF3B3B", wiki:"Roberto_Sánchez_Palomino" },
+  { id:"lopezaliaga", short:"RL", nombre:"LÓPEZ ALIAGA", partido:"Renovación Popular",        color:"#4D9FFF", wiki:"Rafael_López_Aliaga" },
+  { id:"nieto",       short:"JN", nombre:"NIETO",        partido:"Partido del Buen Gobierno", color:"#36D68A", wiki:"Jorge_Nieto_Montesinos" },
+  { id:"belmont",     short:"RB", nombre:"BELMONT",      partido:"Partido Cívico Obras",      color:"#B76FFF", wiki:"Ricardo_Belmont_Cassinelli" },
+  { id:"alvarez",     short:"CA", nombre:"ÁLVAREZ",      partido:"País Para Todos",           color:"#00D4D4", wiki:null },
+  { id:"pereztello",  short:"MP", nombre:"PÉREZ TELLO",  partido:"Primero la Gente",          color:"#FFD93D", wiki:"Marisol_Pérez_Tello" },
+  { id:"espa",        short:"CE", nombre:"ESPÁ",         partido:"Partido Sicreo",            color:"#FF79C6", wiki:null },
+];
+const INIT = BASE.map((b, i) => ({ ...b, ...DATOS[i] }));
+
+const diffVotos = DATOS[1].votos - DATOS[2].votos;
+const TICKER = [
+  `ONPE: ${ACTAS_INIT}% de actas contabilizadas`,
+  `Fujimori lidera con ${DATOS[0].pct}% de votos válidos`,
+  `Sánchez y López Aliaga separados por apenas ${diffVotos.toLocaleString()} votos`,
+  `JEE procesa ${ACTAS_IMPUGNADAS} actas impugnadas`,
+  "Segunda vuelta prevista para el 7 de junio de 2026",
+  "Actas del exterior al 68.266% de procesamiento",
+  "JNE estima proclamación de resultados el 15 de mayo",
+];
+
+function RaceTrack({ candidates, photos, maxPct }) {
+  return (
+    <div style={{padding:"0 0 4px",background:"rgba(0,0,0,0.4)",borderRadius:12,border:"1px solid rgba(232,160,48,0.15)",overflow:"hidden",marginBottom:14}}>
+      <div style={{background:"rgba(232,160,48,0.08)",borderBottom:"1px solid rgba(232,160,48,0.15)",padding:"7px 12px"}}>
+        <span style={{fontSize:9,fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.18em",color:"#E8A030"}}>
+          🏁 PISTA DE VOTACIÓN — CÓMPUTO OFICIAL
+        </span>
+      </div>
+      <div style={{padding:"8px 12px 6px",display:"flex",flexDirection:"column",gap:5}}>
+        {candidates.map((c,i) => {
+          const barW = (c.pct / maxPct) * 100;
+          const isTop2 = i < 2;
+          return (
+            <div key={c.id} style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:16,height:16,borderRadius:"50%",flexShrink:0,background:isTop2?c.color:"rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,fontFamily:"'Share Tech Mono',monospace",color:isTop2?"#000":"rgba(255,255,255,0.35)"}}>{i+1}</div>
+              <div style={{width:22,flexShrink:0,fontSize:9,fontFamily:"'Share Tech Mono',monospace",color:c.color,fontWeight:700}}>{c.short}</div>
+              <div style={{flex:1,height:22,position:"relative",background:"rgba(255,255,255,0.03)",borderRadius:3,border:"1px solid rgba(255,255,255,0.05)",overflow:"visible"}}>
+                <div style={{position:"absolute",top:0,left:0,height:"100%",width:`${barW}%`,borderRadius:"3px 0 0 3px",background:`linear-gradient(90deg,${c.color}18,${c.color}55)`,transition:"width 1.8s cubic-bezier(.34,1.56,.64,1)"}}/>
+                <div style={{position:"absolute",top:"50%",transform:"translateY(-50%)",left:`calc(${barW}% - 14px)`,width:28,height:28,borderRadius:"50%",background:isTop2?`radial-gradient(circle,${c.color},${c.color}88)`:`radial-gradient(circle,${c.color}88,${c.color}44)`,boxShadow:`0 0 ${isTop2?14:8}px ${c.color}${isTop2?"cc":"66"}`,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0,border:`2px solid ${c.color}${isTop2?"ff":"88"}`,transition:"left 1.8s cubic-bezier(.34,1.56,.64,1)",zIndex:2}}>
+                  {photos[c.id]
+                    ? <img src={photos[c.id]} alt={c.short} style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}} onError={e=>{e.target.style.display="none"}}/>
+                    : <span style={{fontSize:8,fontWeight:700,color:isTop2?"#000":"#fff",fontFamily:"'Share Tech Mono',monospace"}}>{c.short}</span>
+                  }
+                </div>
+              </div>
+              <div style={{width:52,flexShrink:0,textAlign:"right",fontSize:11,fontWeight:700,fontFamily:"'Share Tech Mono',monospace",color:c.color,textShadow:isTop2?`0 0 10px ${c.color}88`:""}}>{c.pct.toFixed(2)}%</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function BattleBar({ s, t }) {
+  const diff  = s.votos - t.votos;
+  const diffP = (s.pct - t.pct).toFixed(3);
+  const total = s.votos + t.votos;
+  const sw    = (s.votos / total * 100).toFixed(1);
+  const tw    = (t.votos / total * 100).toFixed(1);
+  return (
+    <div style={{borderRadius:12,overflow:"hidden",marginBottom:12,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(0,0,0,0.35)",animation:"fadeUp .5s ease .2s both"}}>
+      <div style={{background:"rgba(255,255,255,0.04)",borderBottom:"1px solid rgba(255,255,255,0.07)",padding:"7px 12px"}}>
+        <span style={{fontSize:9,fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.18em",color:"rgba(255,255,255,0.45)"}}>⚔ DISPUTA POR EL SEGUNDO CUPO</span>
+      </div>
+      <div style={{padding:"12px 14px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:8,fontFamily:"'Share Tech Mono',monospace",color:"rgba(255,255,255,0.3)",letterSpacing:"0.12em",marginBottom:3}}>{s.nombre}</div>
+            <div style={{fontSize:28,fontWeight:700,lineHeight:1,fontFamily:"'Share Tech Mono',monospace",color:s.color,textShadow:`-1px 0 rgba(255,60,60,0.5),1px 0 rgba(60,120,255,0.5),0 0 14px ${s.color}66`}}>{s.pct.toFixed(3)}%</div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.22)",marginTop:2}}>{s.votos.toLocaleString()} votos</div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 12px",background:"rgba(0,0,0,0.5)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,minWidth:90}}>
+            <div style={{fontSize:7,fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.14em",color:"rgba(255,255,255,0.25)",marginBottom:4}}>DIFERENCIA</div>
+            <div style={{fontSize:22,fontWeight:700,fontFamily:"'Share Tech Mono',monospace",color:"#FFD93D",lineHeight:1,textShadow:"0 0 16px rgba(255,217,61,0.6)"}}>{diff.toLocaleString()}</div>
+            <div style={{fontSize:8,color:"rgba(255,217,61,0.55)",marginTop:3,fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.06em"}}>votos · {diffP}%</div>
+          </div>
+          <div style={{flex:1,textAlign:"right"}}>
+            <div style={{fontSize:8,fontFamily:"'Share Tech Mono',monospace",color:"rgba(255,255,255,0.3)",letterSpacing:"0.12em",marginBottom:3}}>{t.nombre}</div>
+            <div style={{fontSize:28,fontWeight:700,lineHeight:1,fontFamily:"'Share Tech Mono',monospace",color:t.color,textShadow:`-1px 0 rgba(255,60,60,0.5),1px 0 rgba(60,120,255,0.5),0 0 14px ${t.color}66`}}>{t.pct.toFixed(3)}%</div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.22)",marginTop:2,textAlign:"right"}}>{t.votos.toLocaleString()} votos</div>
+          </div>
+        </div>
+        <div style={{height:8,display:"flex",borderRadius:4,overflow:"hidden",gap:3}}>
+          <div style={{width:`${sw}%`,background:`linear-gradient(90deg,${s.color}44,${s.color})`,borderRadius:"4px 0 0 4px",boxShadow:`0 0 10px ${s.color}66`,transition:"width 1.5s ease"}}/>
+          <div style={{width:`${tw}%`,background:`linear-gradient(90deg,${t.color},${t.color}44)`,borderRadius:"0 4px 4px 0",transition:"width 1.5s ease"}}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniRow({ c, photo, maxPct }) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 11px",borderRadius:9,background:"rgba(255,255,255,0.025)",border:"1px solid rgba(255,255,255,0.05)"}}>
+      <div style={{width:34,height:34,borderRadius:"50%",overflow:"hidden",flexShrink:0,background:`radial-gradient(circle,${c.color}33,${c.color}11)`,border:`1.5px solid ${c.color}55`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {photo
+          ? <img src={photo} alt={c.short} style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}} onError={e=>{e.target.style.display="none"}}/>
+          : <span style={{fontSize:10,fontWeight:700,color:c.color,fontFamily:"'Share Tech Mono',monospace"}}>{c.short}</span>
+        }
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:9,color:"rgba(255,255,255,0.4)",letterSpacing:"0.1em",fontFamily:"'Share Tech Mono',monospace",marginBottom:4}}>{c.nombre}</div>
+        <div style={{height:3,background:"rgba(255,255,255,0.05)",borderRadius:2}}>
+          <div style={{height:"100%",borderRadius:2,background:c.color,width:`${(c.pct/maxPct)*100}%`,transition:"width 1.5s ease"}}/>
+        </div>
+      </div>
+      <div style={{textAlign:"right",flexShrink:0}}>
+        <div style={{fontSize:14,fontWeight:700,color:c.color,fontFamily:"'Share Tech Mono',monospace"}}>{c.pct.toFixed(2)}%</div>
+        <div style={{fontSize:8,color:"rgba(255,255,255,0.2)"}}>{c.votos.toLocaleString()}</div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [candidates, setCandidates] = useState(INIT);
+  const [actasPct,   setActasPct]   = useState(ACTAS_INIT);
+  const [photos,     setPhotos]     = useState({});
+  const [animPct,    setAnimPct]    = useState(0);
+  const [loading,    setLoading]    = useState(false);
+  const [dots,       setDots]       = useState("");
+  const [lastUpd,    setLastUpd]    = useState(ULTIMA_ACT);
+  const [blink,      setBlink]      = useState(true);
+  const maxPct = candidates[0].pct;
+
+  useEffect(() => {
+    let raf, t0 = null;
+    const tick = ts => {
+      if (!t0) t0 = ts;
+      const p = Math.min((ts-t0)/2400,1);
+      setAnimPct(actasPct*(1-Math.pow(1-p,3)));
+      if (p<1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [actasPct]);
+
+  useEffect(() => {
+    const i = setInterval(() => setBlink(b=>!b), 900);
+    return () => clearInterval(i);
+  }, []);
+
+  useEffect(() => {
+    if (!loading) { setDots(""); return; }
+    const i = setInterval(() => setDots(d => d.length>=3?"":d+"."), 400);
+    return () => clearInterval(i);
+  }, [loading]);
+
+  useEffect(() => {
+    INIT.forEach(async c => {
+      if (!c.wiki) return;
+      try {
+        const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${c.wiki}`);
+        const d = await r.json();
+        if (d.thumbnail?.source) setPhotos(p=>({...p,[c.id]:d.thumbnail.source}));
+      } catch(_) {}
+    });
+  }, []);
+
+  const actualizar = async () => {
+    setLoading(true);
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:1000,
+          tools:[{type:"web_search_20250305",name:"web_search"}],
+          system:`Extrae resultados ONPE más recientes elecciones Peru 2026. SOLO JSON sin markdown:
+{"porcentaje":93.487,"ultimaActualizacion":"19/04/2026, 13:34","candidatos":[{"id":"fujimori","pct":17.056,"votos":2687621},{"id":"sanchez","pct":12.007,"votos":1892064},{"id":"lopezaliaga","pct":11.921,"votos":1878493},{"id":"nieto","pct":11.063,"votos":1743316},{"id":"belmont","pct":10.167,"votos":1601087},{"id":"alvarez","pct":7.886,"votos":1241785},{"id":"pereztello","pct":3.431,"votos":540130},{"id":"espa","pct":3.376,"votos":531413}]}`,
+          messages:[{role:"user",content:"Resultados ONPE Peru 2026 más recientes"}]
+        })
+      });
+      const json = await resp.json();
+      const raw  = json.content?.find(b=>b.type==="text")?.text||"";
+      const p    = JSON.parse(raw.replace(/```json|```/g,"").trim());
+      if (p.candidatos) setCandidates(prev=>prev.map(c=>{
+        const u=p.candidatos.find(x=>x.id===c.id);
+        return u?{...c,pct:u.pct??c.pct,votos:u.votos??c.votos}:c;
+      }));
+      if (p.porcentaje) setActasPct(p.porcentaje);
+      if (p.ultimaActualizacion) setLastUpd(p.ultimaActualizacion);
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const tickerFull = [...TICKER,...TICKER].join("   ·   ");
+
+  return (
+    <div style={{minHeight:"100vh",background:"#060608",color:"#E8E4DC",fontFamily:"sans-serif",overflow:"hidden",position:"relative"}}>
+
+      {/* Scanlines */}
+      <div style={{position:"fixed",inset:0,zIndex:50,pointerEvents:"none",background:"repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.12) 3px,rgba(0,0,0,0.12) 4px)"}}/>
+
+      {/* Header */}
+      <div style={{background:"#0A0A0F",borderBottom:"2px solid #C01010",position:"relative",zIndex:10}}>
+        <div style={{background:"linear-gradient(90deg,#1a0000,#0A0A0F 50%,#001a1a)",padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{display:"flex",gap:2}}>
+              <div style={{width:4,height:32,background:"#C01010",borderRadius:2}}/>
+              <div style={{width:4,height:32,background:"#E8E4DC",borderRadius:2}}/>
+              <div style={{width:4,height:32,background:"#C01010",borderRadius:2}}/>
+            </div>
+            <div>
+              <div style={{fontSize:8,color:"#E8A030",fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.22em",marginBottom:2}}>TRANSMISIÓN ESPECIAL</div>
+              <div style={{fontSize:22,fontWeight:700,fontFamily:"'Oswald',sans-serif",letterSpacing:"0.04em",lineHeight:1,color:"#E8E4DC",animation:"glitch 7s ease infinite"}}>
+                PERÚ <span style={{color:"#C01010"}}>ELIGE</span> 2026
+              </div>
+            </div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5}}>
+            <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(192,16,16,0.25)",border:"1px solid #C01010",borderRadius:5,padding:"3px 8px"}}>
+              <div style={{width:7,height:7,borderRadius:"50%",background:"#FF3B3B",boxShadow:"0 0 8px #FF3B3B",opacity:blink?1:0.2,transition:"opacity 0.3s"}}/>
+              <span style={{fontSize:9,fontWeight:700,fontFamily:"'Share Tech Mono',monospace",color:"#FF3B3B",letterSpacing:"0.12em"}}>EN VIVO</span>
+            </div>
+            <div style={{fontSize:8,color:"rgba(255,255,255,0.25)",fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.06em"}}>{lastUpd}</div>
+          </div>
+        </div>
+
+        <div style={{background:"rgba(0,0,0,0.5)",borderTop:"1px solid rgba(232,160,48,0.15)",borderBottom:"1px solid rgba(232,160,48,0.15)",padding:"12px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{fontSize:8,color:"rgba(255,255,255,0.3)",fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.18em",marginBottom:4}}>ACTAS PROCESADAS · ONPE</div>
+            <div style={{fontSize:52,fontWeight:700,lineHeight:1,fontFamily:"'Share Tech Mono',monospace",color:"#E8A030",animation:"pulse-glow 2.5s ease infinite"}}>
+              {animPct.toFixed(3)}<span style={{fontSize:24,color:"rgba(232,160,48,0.7)"}}>%</span>
+            </div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}>
+            {[["PENDIENTES",ACTAS_PENDIENTES,"#36D68A"],["IMPUGNADAS",ACTAS_IMPUGNADAS,"#FFD93D"],["REGIONES","26","rgba(255,255,255,0.4)"]].map(([l,v,c])=>(
+              <div key={l} style={{textAlign:"right"}}>
+                <div style={{fontSize:7,fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.12em",color:"rgba(255,255,255,0.25)"}}>{l}</div>
+                <div style={{fontSize:12,fontWeight:700,color:c,fontFamily:"'Share Tech Mono',monospace"}}>{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{padding:"10px 14px"}}>
+          <button onClick={actualizar} disabled={loading} style={{width:"100%",padding:"10px",borderRadius:6,background:loading?"rgba(192,16,16,0.06)":"rgba(192,16,16,0.15)",border:`1px solid rgba(192,16,16,${loading?"0.2":"0.5"})`,color:loading?"rgba(255,80,80,0.4)":"#FF6B6B",fontSize:11,fontWeight:700,fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.18em",cursor:loading?"wait":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:loading?"none":"0 0 16px rgba(192,16,16,0.12)",transition:"all 0.2s"}}>
+            <span style={{animation:loading?"spin 1s linear infinite":"none",display:"inline-block"}}>⟳</span>
+            {loading?`BUSCANDO DATOS${dots}`:"ACTUALIZAR RESULTADOS"}
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{position:"relative",zIndex:10,padding:"12px 12px 0"}}>
+        <RaceTrack candidates={candidates} photos={photos} maxPct={maxPct}/>
+        <BattleBar s={candidates[1]} t={candidates[2]}/>
+
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+          <div style={{flex:1,height:1,background:"rgba(232,160,48,0.15)"}}/>
+          <span style={{fontSize:8,color:"rgba(232,160,48,0.5)",fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.2em"}}>OTROS CANDIDATOS</span>
+          <div style={{flex:1,height:1,background:"rgba(232,160,48,0.15)"}}/>
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+          {candidates.slice(4).map(c=>(
+            <MiniRow key={c.id} c={c} photo={photos[c.id]} maxPct={maxPct}/>
+          ))}
+        </div>
+
+        <div style={{borderRadius:10,padding:"11px 14px",marginBottom:0,background:"rgba(192,16,16,0.07)",border:"1px solid rgba(192,16,16,0.2)",textAlign:"center"}}>
+          <div style={{fontSize:8,fontFamily:"'Share Tech Mono',monospace",color:"rgba(255,255,255,0.3)",letterSpacing:"0.2em",marginBottom:4}}>SEGUNDA VUELTA</div>
+          <div style={{fontSize:16,fontWeight:700,fontFamily:"'Oswald',sans-serif",color:"#E8E4DC",letterSpacing:"0.04em"}}>7 DE JUNIO DE 2026</div>
+          <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",marginTop:3,fontFamily:"'Share Tech Mono',monospace"}}>Sánchez vs López Aliaga disputan el segundo cupo</div>
+        </div>
+      </div>
+
+      {/* Ticker */}
+      <div style={{position:"sticky",bottom:0,zIndex:20,marginTop:12,background:"#C01010",overflow:"hidden",borderTop:"1px solid rgba(255,255,255,0.15)"}}>
+        <div style={{display:"flex",alignItems:"center"}}>
+          <div style={{background:"#8b0000",padding:"5px 10px",flexShrink:0,fontSize:9,fontWeight:700,fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.12em",color:"#FFD93D",borderRight:"1px solid rgba(255,255,255,0.2)",whiteSpace:"nowrap"}}>EN VIVO</div>
+          <div style={{overflow:"hidden",flex:1}}>
+            <div style={{whiteSpace:"nowrap",fontSize:9,color:"white",padding:"5px 0",fontFamily:"'Share Tech Mono',monospace",letterSpacing:"0.05em",animation:"ticker 38s linear infinite"}}>
+              {tickerFull}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
