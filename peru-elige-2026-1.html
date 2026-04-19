@@ -345,4 +345,31 @@ function App() {
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
+  <script>
+// API PÚBLICA y GRATIS de resultados ONPE 2026 (actualiza sola)
+const ONPE_API_URL = "https://devapp.zaylar.com/api/elections/presidential";
+
+async function actualizarDatosONPE() {
+  try {
+    const response = await fetch(ONPE_API_URL, { cache: 'no-cache' });
+    const data = await response.json();
+
+    console.log("✅ Datos ONPE 2026 actualizados:", data);
+
+    // === CAMBIA ESTO con los IDs de TU página ===
+    // Ejemplo:
+    // document.getElementById('actas-contabilizadas').textContent = data.percentage + '%';
+    // document.getElementById('ultima-actualizacion').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-PE');
+
+    // Si tienes Chart.js, actualiza los gráficos aquí con data.candidates
+
+  } catch (error) {
+    console.error("Error:", error);
+  }
+}
+
+// Carga al abrir y cada 90 segundos
+actualizarDatosONPE();
+setInterval(actualizarDatosONPE, 90000);
+  </script>
 </html>
